@@ -89,6 +89,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+tfm-venv/
 
 # Spyder project settings
 .spyderproject
