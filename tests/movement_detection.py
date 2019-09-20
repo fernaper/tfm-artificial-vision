@@ -2,61 +2,16 @@
 
 import cv2
 
+from utilities import VideoController
+
 # This is my own library
-from cv2_tools.Management import ManagerCV2
 from cv2_tools.Selection import SelectorCV2
 
 
-class MovementDetector():
-
-    
-    @staticmethod
-    def frame_conversion(frame):
-        # 1º Grayscale conversion
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # 2º Noise suppression
-        return cv2.GaussianBlur(gray_frame, (21, 21), 0)
-
-
-    @staticmethod
-    def find_contours(frame, min_area=500):
-        contours_img = frame.copy()
-        contours, hierarchy = cv2.findContours(contours_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        valid_contours = []
-
-        for i, contour in enumerate(contours):
-            # You can check whether a contour with index i is inside another by checking if hierarchy[0,i,3] equals -1 or not.
-            # If it is different from -1, then the contour is inside another and we want to ignore it.
-            if hierarchy[0, i, 3] != -1:
-                continue
-
-            # Ignore small contours
-            if cv2.contourArea(contour) < min_area:
-                continue
-            # Rectangle of the contour
-            x, y, w, h = cv2.boundingRect(contour)
-            valid_contours.append((x, y, x + w, y + h))
-
-        return valid_contours
-
-
-    def __init__(self, video, stream, fps, dilate=False):
-        self.dilate = dilate
-        self.manager_cv2 = ManagerCV2(cv2.VideoCapture(video), is_stream=stream, fps_limit=fps)
-        self.manager_cv2.add_keystroke(27, 1, exit=True) # Exit when `Esc`
-        self.manager_cv2.add_keystroke(ord(' '), 1, 'action')
-
-
-    def run(self):
-        for frame in self.manager_cv2:
-            cv2.imshow("Movement Detector", frame)
-        cv2.destroyAllWindows()
-
-
-class BasicMovementDetector(MovementDetector):
+class BasicMovementDetector(VideoController):
 
     def __init__(self, video, stream, fps, dilate=True):
-        MovementDetector.__init__(self, video, stream, fps, dilate)
+        VideoController.__init__(self, video, stream, fps, dilate)
 
 
     def run(self):
@@ -65,13 +20,13 @@ class BasicMovementDetector(MovementDetector):
         for frame in self.manager_cv2:
             if first_frame is None or self.manager_cv2.key_manager.action:
                 self.manager_cv2.key_manager.action = False
-                first_frame = MovementDetector.frame_conversion(frame)
+                first_frame = VideoController.frame_conversion(frame)
                 continue
 
             # Helper selector to draw contours
             selector = SelectorCV2(color=(0, 0, 200), peephole=False)
 
-            gray_frame = MovementDetector.frame_conversion(frame)
+            gray_frame = VideoController.frame_conversion(frame)
             # 1º Absolute substraction
             substraction = cv2.absdiff(first_frame, gray_frame)
             # 2º Set threshold
@@ -80,7 +35,7 @@ class BasicMovementDetector(MovementDetector):
             if self.dilate:
                 threshold = cv2.dilate(threshold, None, iterations=2)
             # 3º Contour/blob detection
-            contours = MovementDetector.find_contours(threshold)
+            contours = VideoController.find_contours(threshold)
 
             for contour in contours:
                 selector.add_zone(contour)
@@ -93,10 +48,10 @@ class BasicMovementDetector(MovementDetector):
         cv2.destroyAllWindows()
 
 
-class MOG2MovementDetector(MovementDetector):
+class MOG2MovementDetector(VideoController):
 
     def __init__(self, video, stream, fps, dilate=False):
-        MovementDetector.__init__(self, video, stream, fps)
+        VideoController.__init__(self, video, stream, fps)
 
 
     def run(self):
@@ -119,7 +74,7 @@ class MOG2MovementDetector(MovementDetector):
             if self.dilate:
                 fg_mask = cv2.dilate(fg_mask, None, iterations=2)
 
-            contours = MovementDetector.find_contours(fg_mask)
+            contours = VideoController.find_contours(fg_mask)
 
             for contour in contours:
                 selector.add_zone(contour)
@@ -132,10 +87,10 @@ class MOG2MovementDetector(MovementDetector):
         cv2.destroyAllWindows()
 
 
-class KNNMovementDetector(MovementDetector):
+class KNNMovementDetector(VideoController):
 
     def __init__(self, video, stream, fps, dilate=False):
-        MovementDetector.__init__(self, video, stream, fps, dilate)
+        VideoController.__init__(self, video, stream, fps, dilate)
 
 
     def run(self):
@@ -158,7 +113,7 @@ class KNNMovementDetector(MovementDetector):
             if self.dilate:
                 fg_mask = cv2.dilate(fg_mask, None, iterations=2)
 
-            contours = MovementDetector.find_contours(fg_mask)
+            contours = VideoController.find_contours(fg_mask)
 
             for contour in contours:
                 selector.add_zone(contour)

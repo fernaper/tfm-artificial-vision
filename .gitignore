@@ -110,3 +110,4 @@ tfm-venv/
 # extra gitignore
 notes/days/
 videos/
+*.pdf
