@@ -70,7 +70,8 @@ class VideoController():
     def __init__(self, video, stream, fps, dilate=False, detect_scenes=False, name='MovementDetector'):
         self.dilate = dilate
         self.name = name
-        self.manager_cv2 = ManagerCV2(cv2.VideoCapture(video), is_stream=stream, fps_limit=fps, detect_scenes=detect_scenes)
+        self.manager_cv2 = ManagerCV2(cv2.VideoCapture(video),
+            is_stream=stream, fps_limit=fps, detect_scenes=detect_scenes)
         self.manager_cv2.add_keystroke(27, 1, exit=True) # Exit when `Esc`
         self.manager_cv2.add_keystroke(ord(' '), 1, 'action')
 

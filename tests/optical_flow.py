@@ -31,7 +31,7 @@ class LucasKanade_OF(VideoController):
     A better solution is obtained with least square fit method. 
     '''
 
-    def __init__(self, video, stream, fps):
+    def __init__(self, video, stream, fps, **kwargs):
         VideoController.__init__(self, video, stream, fps)
 
         max_corners = 200
@@ -101,6 +101,57 @@ class LucasKanade_OF(VideoController):
                 mask = np.zeros_like(prev_gray_frame) # Mask image (for drawing)
 
 
+class Dense_OF(VideoController):
+
+    def __init__(self, video, stream, fps, scale=1):
+        VideoController.__init__(self, video, stream, fps)
+        max_corners = 200
+
+        # Parameters for ShiTomasi corner detection
+        self.feature_params = {
+            'maxCorners': max_corners,
+            'qualityLevel': 0.3,
+            'minDistance': 7,
+            'blockSize': 7
+        }
+
+        self.scale = scale
+
+    
+    def run(self):
+        gray_frame = None
+        hsv = None
+
+        for frame in self.manager_cv2:
+            frame = cv2.resize(frame, None, fx=self.scale, fy=self.scale)
+            height, width = frame.shape[:2]
+
+            prev_gray_frame = gray_frame
+            gray_frame = VideoController.gray_conversion(frame)
+
+            if prev_gray_frame is None or self.manager_cv2.key_manager.action or self.manager_cv2.count_frames % 60 == 0:
+                self.manager_cv2.key_manager.action = False
+
+                prev_gray_frame = gray_frame
+                hsv = np.zeros((height, width, 3), dtype=np.uint8)
+                hsv[..., 1] = 255
+
+                continue
+
+            flow = cv2.calcOpticalFlowFarneback(prev_gray_frame, gray_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+
+            hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+            hsv[..., 0] = ang * (180 / np.pi / 2)
+
+            bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            frame = cv2.add(frame, bgr*2)
+
+            prev_gray_frame = gray_frame
+
+            cv2.imshow('Dense_OF', frame)
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -117,10 +168,33 @@ if __name__ == "__main__":
         help='int parameter to indicate the limit of FPS (default 0, it means no limit)',
         type=int)
 
+    parser.add_argument('-a', '--algorithm', default='kanade',
+        help='Algorithm to use <kanade>/<dense> Default: kanade')
+
+    parser.add_argument('-S', '--scale', default=1.0,
+        help='Scale of the video',
+        type=float)
+
     args = parser.parse_args()
 
     if type(args.video) is str and args.video.isdigit():
         args.video = int(args.video)
 
-    of = LucasKanade_OF(args.video, args.stream, args.fps)
+    args.algorithm = args.algorithm.lower()
+
+    optical_detector = {
+        'kanade': LucasKanade_OF,
+        'dense': Dense_OF,
+    }
+
+    if args.algorithm not in optical_detector:
+        print('Warning: Algorithm selected invalid. Using default one: kanade')
+        args.algorithm = 'kanade'
+
+    kwargs = {}
+
+    if args.scale is not None:
+        kwargs['scale'] = args.scale
+
+    of = optical_detector[args.algorithm](args.video, args.stream, args.fps, **kwargs)
     of.run()
