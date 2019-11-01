@@ -7,7 +7,7 @@ lazy-object-proxy==1.4.2
 mccabe==0.6.1
 numpy==1.17.2
 opencv-python==4.1.1.26
-Pillow==6.1.0
+Pillow==6.2.0
 pylint==2.3.1
 python-constraint==1.4.0
 PyWavelets==1.0.3
