@@ -111,3 +111,7 @@ tfm-venv/
 notes/days/
 videos/
 *.pdf
+
+coco/
+coco/**
+*.zip

@@ -1,11 +1,49 @@
+#!/usr/bin/python3.6
+# -*- coding: utf-8 -*-
+
+""" Lucas Kanade Optical Flow
+    and Dense Optical Flow
+
+    You can select both of them from
+    command line.
+"""
+
 # Idea from: https://docs.opencv.org/3.4/d4/dee/tutorial_optical_flow.html
 # http://www.inf.fu-berlin.de/inst/ag-ki/rojas_home/documents/tutorials/Lucas-Kanade2.pdf
 # https://www.youtube.com/watch?v=1r8E9uAcn4E
+
+# TODO: https://nanonets.com/blog/optical-flow/
+# Check: Horn–Schunck method and Buxton–Buxton method
 
 import cv2
 import numpy as np
 
 from utilities import VideoController
+from cv2_tools.Selection import SelectorCV2
+
+
+# -----------------------------
+
+import sys
+
+confidence = 0.5
+threshold= 0.3
+labelsPath = '/media/fernando/WindowsHardDisk/CommonDocuments/GitHub/tfm-artificial-vision/darknet/cfg/coco.names'
+
+LABELS = open(labelsPath).read().strip().split("\n")
+np.random.seed(42)
+COLORS = np.random.randint(0, 255, size=(len(LABELS), 3),dtype="uint8")
+weightsPath = '/media/fernando/WindowsHardDisk/CommonDocuments/GitHub/tfm-artificial-vision/darknet/yolov3.weights'
+configPath = '/media/fernando/WindowsHardDisk/CommonDocuments/GitHub/tfm-artificial-vision/darknet/cfg/yolov3.cfg'
+# load our YOLO object detector trained on COCO dataset (80 classes)
+print("[INFO] loading YOLO from disk...")
+net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
+ln = net.getLayerNames()
+ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+np.set_printoptions(threshold=sys.maxsize)
+
+# -----------------------------
+
 
 # From now on, OF means Optical Flow
 
@@ -31,7 +69,7 @@ class LucasKanade_OF(VideoController):
     A better solution is obtained with least square fit method. 
     '''
 
-    def __init__(self, video, stream, fps, **kwargs):
+    def __init__(self, video, stream, fps, scale=1, separate_frame=None, concatenate_frame=None, **kwargs):
         VideoController.__init__(self, video, stream, fps)
 
         max_corners = 200
@@ -54,14 +92,41 @@ class LucasKanade_OF(VideoController):
         # Create some random colors
         self.color = np.random.randint(0, 255, (max_corners, 3))
 
+        self.scale = scale
+        self.separate_frame = separate_frame
+        self.concatenate_frame = concatenate_frame
+
+
+    def __set_win_size(self, x):
+        if x < 5 or x > 50:
+            return
+        self.lk_params['winSize'] = (x + 5, x + 5)
+
+    
+    def __set_max_level(self, x):
+        if x < 1 or x > 10:
+            return
+        self.lk_params['maxLevel'] = x + 1
+
     
     def run(self):
         gray_frame = None
         current_points = None
         mask = None
+        window_name = 'Lucas Kanade'
+
+        cv2.namedWindow(window_name)
+        cv2.createTrackbar('WinSize+5', window_name, 0, 45, self.__set_win_size)
+        cv2.createTrackbar('Maxlevel+1', window_name, 0, 20, self.__set_max_level)
 
         for frame in self.manager_cv2:
             prev_gray_frame = gray_frame
+
+            if self.separate_frame is not None:
+                frame, not_processable_frame = self.separate_frame(frame, fx=self.scale, fy=self.scale)
+            else:
+                frame = cv2.resize(frame, None, fx=self.scale, fy=self.scale)
+
             gray_frame = VideoController.gray_conversion(frame)
 
             if prev_gray_frame is None or self.manager_cv2.key_manager.action or self.manager_cv2.count_frames % 60 == 0:
@@ -82,7 +147,7 @@ class LucasKanade_OF(VideoController):
             good_new = next_points[status == 1]
 
             # Draw the tracks
-            for i, (new, old) in enumerate(zip(good_new, good_old)):
+            for (new, old) in zip(good_new, good_old):
                 old_x, old_y = old.ravel()
                 new_x, new_y = new.ravel()
 
@@ -91,7 +156,11 @@ class LucasKanade_OF(VideoController):
 
             frame = cv2.add(frame, cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB))
 
-            cv2.imshow('Lucas Kanade', frame)
+            final_frame = frame
+            if self.concatenate_frame is not None:
+                final_frame = self.concatenate_frame(frame, not_processable_frame)
+
+            cv2.imshow(window_name, final_frame)
 
             # Now update the previous frame and previous points
             prev_gray_frame = gray_frame.copy()
@@ -103,7 +172,7 @@ class LucasKanade_OF(VideoController):
 
 class Dense_OF(VideoController):
 
-    def __init__(self, video, stream, fps, scale=1):
+    def __init__(self, video, stream, fps, scale=1, separate_frame=None, concatenate_frame=None, process_all_frame=True):
         VideoController.__init__(self, video, stream, fps)
         max_corners = 200
 
@@ -116,14 +185,21 @@ class Dense_OF(VideoController):
         }
 
         self.scale = scale
+        self.separate_frame = separate_frame
+        self.concatenate_frame = concatenate_frame
+        self.process_all_frame = process_all_frame
 
-    
+
     def run(self):
         gray_frame = None
         hsv = None
 
         for frame in self.manager_cv2:
-            frame = cv2.resize(frame, None, fx=self.scale, fy=self.scale)
+            if not self.process_all_frame and self.separate_frame is not None:
+                frame, not_processable_frame = self.separate_frame(frame, fx=self.scale, fy=self.scale)
+            else:
+                frame = cv2.resize(frame, None, fx=self.scale, fy=self.scale)
+
             height, width = frame.shape[:2]
 
             prev_gray_frame = gray_frame
@@ -145,11 +221,73 @@ class Dense_OF(VideoController):
             hsv[..., 0] = ang * (180 / np.pi / 2)
 
             bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            cv2.imshow('BGR', bgr)
+            blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),swapRB=True, crop=False)
+
             frame = cv2.add(frame, bgr*2)
 
             prev_gray_frame = gray_frame
 
-            cv2.imshow('Dense_OF', frame)
+            frame = self.detect(frame, blob, height, width)
+            final_frame = frame
+            if not self.process_all_frame and self.concatenate_frame is not None:
+                final_frame = self.concatenate_frame(frame, not_processable_frame)
+                
+
+            cv2.imshow('Dense_OF', final_frame)
+
+
+    def detect(self, frame, blob, height, width):
+        net.setInput(blob)
+        layerOutputs = net.forward(ln)
+
+        boxes = []
+        confidences = []
+        classIDs = []
+
+        selector = SelectorCV2(color=(200,90,0), filled=True, show_vertexes=True)
+
+        for output in layerOutputs:       
+            for detection in output:            
+                scores = detection[5:]
+                classID = np.argmax(scores)           
+                confidence = scores[classID]
+                if confidence > 0.5:
+                    box = detection[0:4] * np.array([width, height]*2)
+                    (centerX, centerY, width, height) = box.astype("int")
+                    x = int(centerX - (width / 2))
+                    y = int(centerY - (height / 2))
+                    boxes.append([x, y, int(width), int(height)])
+                    confidences.append(float(confidence))
+                    classIDs.append(classID)
+
+                idxs = cv2.dnn.NMSBoxes(boxes, confidences, 0.5,0.3)            
+                if len(idxs) > 0:                
+                    for i in idxs.flatten():
+                        (x, y) = (boxes[i][0], boxes[i][1])
+                        (w, h) = (boxes[i][2], boxes[i][3])
+                        color = [int(c) for c in COLORS[classIDs[i]]]
+                        text = "{}: {:.4f}".format(LABELS[classIDs[i]], confidences[i])
+                        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                        cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,0.5, color, 2)
+
+        return selector.draw(frame)
+
+
+def separate_processable_frame(frame, fx=1, fy=1):
+    # Split into processable frame and not processable
+    not_processable_frame_height = int(frame.shape[0]/3)
+    not_processable_frame = frame[:not_processable_frame_height, :]
+    not_processable_frame = cv2.resize(not_processable_frame, None, fx=fx, fy=fy)
+
+    frame = frame[not_processable_frame_height:, :]
+    frame = cv2.resize(frame, None, fx=fx, fy=fy)
+
+    return frame, not_processable_frame
+
+
+def concatenate_processable_frame(frame, not_processable_frame):
+    return np.concatenate((not_processable_frame, frame), axis=0)
 
 
 if __name__ == "__main__":
@@ -174,6 +312,9 @@ if __name__ == "__main__":
     parser.add_argument('-S', '--scale', default=1.0,
         help='Scale of the video',
         type=float)
+    
+    parser.add_argument('-c', '--complete_frame', action='store_true',
+                        help='Detect in complete frame (True|False)')
 
     args = parser.parse_args()
 
@@ -196,5 +337,8 @@ if __name__ == "__main__":
     if args.scale is not None:
         kwargs['scale'] = args.scale
 
-    of = optical_detector[args.algorithm](args.video, args.stream, args.fps, **kwargs)
+    of = optical_detector[args.algorithm](args.video, args.stream, args.fps,
+            process_all_frame=args.complete_frame,
+            separate_frame=separate_processable_frame,
+            concatenate_frame=concatenate_processable_frame, **kwargs)
     of.run()
