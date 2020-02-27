@@ -1,4 +1,5 @@
 import cv2
+
 from cv2_tools.Management import ManagerCV2
 
 

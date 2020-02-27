@@ -2,10 +2,8 @@
 
 import cv2
 
-from utilities import VideoController
-
-# This is my own library
 from cv2_tools.Selection import SelectorCV2
+from tfm_core.utilities import VideoController
 
 
 class BasicMovementDetector(VideoController):

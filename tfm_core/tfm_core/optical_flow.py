@@ -18,31 +18,8 @@
 import cv2
 import numpy as np
 
-from utilities import VideoController
 from cv2_tools.Selection import SelectorCV2
-
-
-# -----------------------------
-
-import sys
-
-confidence = 0.5
-threshold= 0.3
-labelsPath = '/media/fernando/WindowsHardDisk/CommonDocuments/GitHub/tfm-artificial-vision/darknet/cfg/coco.names'
-
-LABELS = open(labelsPath).read().strip().split("\n")
-np.random.seed(42)
-COLORS = np.random.randint(0, 255, size=(len(LABELS), 3),dtype="uint8")
-weightsPath = '/media/fernando/WindowsHardDisk/CommonDocuments/GitHub/tfm-artificial-vision/darknet/yolov3.weights'
-configPath = '/media/fernando/WindowsHardDisk/CommonDocuments/GitHub/tfm-artificial-vision/darknet/cfg/yolov3.cfg'
-# load our YOLO object detector trained on COCO dataset (80 classes)
-print("[INFO] loading YOLO from disk...")
-net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
-ln = net.getLayerNames()
-ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-np.set_printoptions(threshold=sys.maxsize)
-
-# -----------------------------
+from tfm_core.utilities import VideoController
 
 
 # From now on, OF means Optical Flow
@@ -92,7 +69,7 @@ class LucasKanade_OF(VideoController):
         # Create some random colors
         self.color = np.random.randint(0, 255, (max_corners, 3))
 
-        self.scale = scale
+        self.__scale = scale
         self.separate_frame = separate_frame
         self.concatenate_frame = concatenate_frame
 
@@ -123,9 +100,9 @@ class LucasKanade_OF(VideoController):
             prev_gray_frame = gray_frame
 
             if self.separate_frame is not None:
-                frame, not_processable_frame = self.separate_frame(frame, fx=self.scale, fy=self.scale)
+                frame, not_processable_frame = self.separate_frame(frame, fx=self.__scale, fy=self.__scale)
             else:
-                frame = cv2.resize(frame, None, fx=self.scale, fy=self.scale)
+                frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
 
             gray_frame = VideoController.gray_conversion(frame)
 
@@ -184,7 +161,7 @@ class Dense_OF(VideoController):
             'blockSize': 7
         }
 
-        self.scale = scale
+        self.__scale = scale
         self.separate_frame = separate_frame
         self.concatenate_frame = concatenate_frame
         self.process_all_frame = process_all_frame
@@ -195,83 +172,58 @@ class Dense_OF(VideoController):
         hsv = None
 
         for frame in self.manager_cv2:
-            if not self.process_all_frame and self.separate_frame is not None:
-                frame, not_processable_frame = self.separate_frame(frame, fx=self.scale, fy=self.scale)
-            else:
-                frame = cv2.resize(frame, None, fx=self.scale, fy=self.scale)
+            gray_frame, hsv, end = self.next_frame(frame, gray_frame, hsv, show=True)
 
-            height, width = frame.shape[:2]
+            if end:
+                break
+
+
+    def next_frame(self, frame, gray_frame, hsv, show=False):
+        if not self.process_all_frame and self.separate_frame is not None:
+            frame, not_processable_frame = self.separate_frame(frame, fx=self.__scale, fy=self.__scale)
+
+        elif self.__scale != 1:
+            frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
+
+        height, width = frame.shape[:2]
+
+        prev_gray_frame = gray_frame
+        gray_frame = VideoController.gray_conversion(frame)
+
+        if prev_gray_frame is None or self.manager_cv2.key_manager.action or self.manager_cv2.count_frames % 60 == 0:
+            self.manager_cv2.key_manager.action = False
 
             prev_gray_frame = gray_frame
-            gray_frame = VideoController.gray_conversion(frame)
+            hsv = np.zeros((height, width, 3), dtype=np.uint8)
+            hsv[..., 1] = 255
 
-            if prev_gray_frame is None or self.manager_cv2.key_manager.action or self.manager_cv2.count_frames % 60 == 0:
-                self.manager_cv2.key_manager.action = False
+            return gray_frame, hsv, False
 
-                prev_gray_frame = gray_frame
-                hsv = np.zeros((height, width, 3), dtype=np.uint8)
-                hsv[..., 1] = 255
+        flow = cv2.calcOpticalFlowFarneback(prev_gray_frame, gray_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
 
-                continue
+        hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+        hsv[..., 0] = ang * (180 / np.pi / 2)
 
-            flow = cv2.calcOpticalFlowFarneback(prev_gray_frame, gray_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-            mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        frame = cv2.add(frame, bgr*2)
 
-            hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
-            hsv[..., 0] = ang * (180 / np.pi / 2)
+        prev_gray_frame = gray_frame
 
-            bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        final_frame = frame
+        if not self.process_all_frame and self.concatenate_frame is not None:
+            final_frame = self.concatenate_frame(frame, not_processable_frame)
+
+
+        end = False
+        if show:
             cv2.imshow('BGR', bgr)
-            blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),swapRB=True, crop=False)
-
-            frame = cv2.add(frame, bgr*2)
-
-            prev_gray_frame = gray_frame
-
-            frame = self.detect(frame, blob, height, width)
-            final_frame = frame
-            if not self.process_all_frame and self.concatenate_frame is not None:
-                final_frame = self.concatenate_frame(frame, not_processable_frame)
-                
-
             cv2.imshow('Dense_OF', final_frame)
 
+            if cv2.waitKey(1) == ord('q'):
+	            end = True
 
-    def detect(self, frame, blob, height, width):
-        net.setInput(blob)
-        layerOutputs = net.forward(ln)
-
-        boxes = []
-        confidences = []
-        classIDs = []
-
-        selector = SelectorCV2(color=(200,90,0), filled=True, show_vertexes=True)
-
-        for output in layerOutputs:       
-            for detection in output:            
-                scores = detection[5:]
-                classID = np.argmax(scores)           
-                confidence = scores[classID]
-                if confidence > 0.5:
-                    box = detection[0:4] * np.array([width, height]*2)
-                    (centerX, centerY, width, height) = box.astype("int")
-                    x = int(centerX - (width / 2))
-                    y = int(centerY - (height / 2))
-                    boxes.append([x, y, int(width), int(height)])
-                    confidences.append(float(confidence))
-                    classIDs.append(classID)
-
-                idxs = cv2.dnn.NMSBoxes(boxes, confidences, 0.5,0.3)            
-                if len(idxs) > 0:                
-                    for i in idxs.flatten():
-                        (x, y) = (boxes[i][0], boxes[i][1])
-                        (w, h) = (boxes[i][2], boxes[i][3])
-                        color = [int(c) for c in COLORS[classIDs[i]]]
-                        text = "{}: {:.4f}".format(LABELS[classIDs[i]], confidences[i])
-                        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-                        cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,0.5, color, 2)
-
-        return selector.draw(frame)
+        return gray_frame, hsv, end
 
 
 def separate_processable_frame(frame, fx=1, fy=1):

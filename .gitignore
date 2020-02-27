@@ -115,3 +115,5 @@ videos/
 coco/
 coco/**
 *.zip
+
+tfm_core/tfm_core.egg-info/

@@ -1,0 +1,12 @@
+# general things to ignore
+config.py
+build/
+dist/
+tests/files/*
+*.egg-info/
+*.egg
+*.py[cod]
+__pycache__/
+*.so
+*~
+.pytest_cache
