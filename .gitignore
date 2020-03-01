@@ -116,4 +116,9 @@ coco/
 coco/**
 *.zip
 
+tfm-ubuntu-venv/
 tfm_core/tfm_core.egg-info/
+tfm_core/tfm_core/yolo-coco/
+logs/
+checkpoints/
+data/

@@ -5,6 +5,7 @@ setup(
     version='1.0',
     packages=[
         'tfm_core',
+        'tfm_core.dnn'
     ],
     include_package_data=True,
     install_requires=[
