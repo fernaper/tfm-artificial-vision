@@ -6,7 +6,7 @@
 import tensorflow as tf
 
 from tfm_core.dnn.residual_block import make_basic_block_layer, make_bottleneck_layer
-from tfm_core.dnn.utilities import cifar10_dataset, checkpoint_callback, tensorboard_callback
+from tfm_core.dnn.utilities import cifar10_dataset, checkpoint_callback, tensorboard_callback, save_model
 
 
 class ResNetTypeI(tf.keras.Model):
@@ -162,3 +162,5 @@ if __name__ == "__main__":
     model.fit(train_dataset, epochs=30, steps_per_epoch=50000//batch_size,
           validation_data=valid_dataset,
           validation_steps=3, callbacks=callbacks)
+
+    save_model(model, model_name='resnet')
