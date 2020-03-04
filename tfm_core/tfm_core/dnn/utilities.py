@@ -1,14 +1,16 @@
+import pathlib
 import tensorflow as tf
+import numpy as np
 
 from datetime import datetime
-
+import matplotlib.pyplot as plt
 from os import listdir
-from os.path import join, isdir
+from os.path import join, isdir, sep
 
 from tfm_core import config
 
 
-def cifar10_dataset(batch_size=64):
+def cifar10_dataset(batch_size=64, **kwargs):
     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size).shuffle(10000)
@@ -22,7 +24,60 @@ def cifar10_dataset(batch_size=64):
     valid_dataset = valid_dataset.map(lambda x, y: (tf.image.central_crop(x, 0.75), y))
     valid_dataset = valid_dataset.repeat()
 
-    return train_dataset, valid_dataset
+    steps_per_epoch = 50000//batch_size
+
+    return train_dataset, valid_dataset, steps_per_epoch, 3
+
+
+def own_dataset(batch_size=32, image_height=64, image_width=32):
+    data_dir = pathlib.Path(join(config.DATA_PATH, 'dataset'))
+    image_count = len(list(data_dir.glob('*/*.jpg')))
+
+    class_names = np.array([item.name for item in data_dir.glob('*')])
+
+    image_generator = tf.keras.preprocessing.image.ImageDataGenerator(
+        rescale=1./255,
+        validation_split=0.2
+    )
+
+    train_generator = image_generator.flow_from_directory(
+        str(data_dir),
+        target_size=(image_height, image_width),
+        batch_size=batch_size,
+        class_mode='binary',
+        subset='training'
+    )
+
+    validation_generator = image_generator.flow_from_directory(
+        str(data_dir),
+        target_size=(image_height, image_width),
+        batch_size=batch_size,
+        class_mode='binary',
+        subset='validation'
+    )
+
+    steps_per_epoch = train_generator.samples // batch_size
+    validations_steps = validation_generator.samples // batch_size
+
+    '''
+    train_data_gen = image_generator.flow_from_directory(
+        directory=str(data_dir),
+        batch_size=batch_size,
+        shuffle=True,
+        target_size=(image_height, image_width),
+        classes = list(class_names)
+    )'''
+
+    return train_generator, validation_generator, steps_per_epoch, validations_steps
+
+
+def show_batch(image_batch, label_batch, class_names):
+    plt.figure(figsize=(10,10))
+    for n in range(25):
+        ax = plt.subplot(5,5,n+1)
+        plt.imshow(image_batch[n])
+        plt.title(class_names[label_batch[n]==1][0].title())
+        plt.axis('off')
 
 
 def checkpoint_callback(model, model_name='resnet'):

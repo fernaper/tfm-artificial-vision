@@ -6,7 +6,7 @@
 import tensorflow as tf
 
 from tfm_core.dnn.residual_block import make_basic_block_layer, make_bottleneck_layer
-from tfm_core.dnn.utilities import cifar10_dataset, checkpoint_callback, tensorboard_callback, save_model
+from tfm_core.dnn.utilities import cifar10_dataset, own_dataset, checkpoint_callback, tensorboard_callback, save_model
 
 
 class ResNetTypeI(tf.keras.Model):
@@ -136,18 +136,27 @@ if __name__ == "__main__":
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
 
-    batch_size = 128
-
     loss = 'sparse_categorical_crossentropy'
     #loss = 'categorical_crossentropy'
 
     #optimizer = tf.keras.optimizers.Adadelta()
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.003)
 
-    train_dataset, valid_dataset = cifar10_dataset(batch_size=batch_size)
+    batch_size = 32 # 128
+    image_height = 64
+    image_width = 32
+    use_own_dataset = True
+
+    get_dataset = own_dataset if use_own_dataset else cifar10_dataset
+
+    train_dataset, valid_dataset, steps_per_epoch, validation_steps = get_dataset(
+        batch_size=batch_size,
+        image_height=image_height,
+        image_width=image_width
+    )
 
     model = resnet_50(num_classes=10)
-    model.build(input_shape=(None, 32, 32, 3))
+    model.build(input_shape=(None, image_height, image_width, 3))
     model.summary()
 
     callbacks = [
@@ -159,8 +168,12 @@ if __name__ == "__main__":
               loss=loss,
               metrics=['acc'])
 
-    model.fit(train_dataset, epochs=30, steps_per_epoch=50000//batch_size,
-          validation_data=valid_dataset,
-          validation_steps=3, callbacks=callbacks)
+    model.fit(train_dataset,
+        epochs=30,
+        steps_per_epoch=steps_per_epoch,
+        validation_data=valid_dataset,
+        validation_steps=validation_steps,
+        callbacks=callbacks
+    )
 
     save_model(model, model_name='resnet')
