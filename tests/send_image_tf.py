@@ -1,7 +1,7 @@
-import base64
 import cv2
 import json
 import numpy as np
+import pathlib
 import requests
 
 from os.path import join
@@ -9,26 +9,44 @@ from os.path import join
 from tfm_core import config
 
 
-def main():
-    image_path = join(config.DATA_PATH, 'blob2.jpg')
-    frame = cv2.imread(image_path)
+def main(folder='binary_dataset'):
+    data_dir = pathlib.Path(join(config.DATA_PATH, folder))
+    images = list(data_dir.glob('*/*'))
 
-    data = json.dumps({"instances": [frame.tolist()]})
+    class_names = np.array([item.name for item in data_dir.glob('*')])
 
-    headers = {"signature_name": "predict", "content-type": "application/json"}
-    json_response = requests.post('http://localhost:8501/v1/models/resnet:predict', data=data, headers=headers)
+    correct = 0
+    total = 0
 
-    response = json.loads(json_response.text)
+    for image_path in images:
+        frame = cv2.imread(image_path.as_posix())
 
-    print(response)
+        data = json.dumps({"instances": [frame.tolist()]})
 
-    predictions = json.loads(json_response.text)['predictions']
-    img = predictions
+        headers = {"signature_name": "predict", "content-type": "application/json"}
+        json_response = requests.post('http://localhost:8501/v1/models/resnet:predict', data=data, headers=headers)
 
-    img = np.asarray(img, dtype=np.float32)
+        response = json.loads(json_response.text)
+        predictions = np.array(response['predictions'][0])
 
-    cv2.imshow('Info', frame)
-    cv2.waitKey(0)
+        #img = predictions
+        #img = np.asarray(img, dtype=np.float32)
+
+        correct_class_index = np.where(class_names == image_path.parent.name)[0][0]
+        detected_class_index = np.where(predictions == np.amax(predictions))[0][0]
+
+        if detected_class_index == correct_class_index:
+            correct +=1
+
+        total += 1
+
+        print('Accuracy:', float(correct)/total, end='\r')
+
+        cv2.imshow('Image', frame)
+        cv2.waitKey(1)
+    
+    print('\nAccuracy:', float(correct)/total)
+
 
 if __name__ == "__main__":
     main()

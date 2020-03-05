@@ -26,11 +26,11 @@ def cifar10_dataset(batch_size=64, **kwargs):
 
     steps_per_epoch = 50000//batch_size
 
-    return train_dataset, valid_dataset, steps_per_epoch, 3
+    return train_dataset, valid_dataset, steps_per_epoch, 3, 10
 
 
-def own_dataset(batch_size=32, image_height=64, image_width=32):
-    data_dir = pathlib.Path(join(config.DATA_PATH, 'dataset'))
+def own_dataset(folder='dataset',batch_size=32, image_height=64, image_width=32):
+    data_dir = pathlib.Path(join(config.DATA_PATH, folder))
     image_count = len(list(data_dir.glob('*/*.jpg')))
 
     class_names = np.array([item.name for item in data_dir.glob('*')])
@@ -68,7 +68,7 @@ def own_dataset(batch_size=32, image_height=64, image_width=32):
         classes = list(class_names)
     )'''
 
-    return train_generator, validation_generator, steps_per_epoch, validations_steps
+    return train_generator, validation_generator, steps_per_epoch, validations_steps, len(class_names)
 
 
 def show_batch(image_batch, label_batch, class_names):
@@ -106,14 +106,14 @@ def save_model(model, model_name='resnet'):
 
     if folders:
         # Get the last version and create the next one
-        version = min(max([int(folder) for folder in folders]) + 1, 1)
+        version = max(max([int(folder) for folder in folders]) + 1, 1)
 
     model_path = join(model_path, str(version))
 
     tf.keras.models.save_model(
         model,
         model_path,
-        overwrite=True,
+        #overwrite=True,
         include_optimizer=True,
         save_format=None,
         signatures=None,

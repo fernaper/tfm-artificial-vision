@@ -130,6 +130,18 @@ def resnet_152(num_classes):
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-f', '--folder', default='dataset',
+        help='Dataset folder (default: dataset)')
+
+    parser.add_argument('-t', '--test', default=False, action='store_true',
+        help='Use test dataset (default False)')
+
+    args = parser.parse_args()
+
     # GPU settings
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
@@ -142,20 +154,23 @@ if __name__ == "__main__":
     #optimizer = tf.keras.optimizers.Adadelta()
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.003)
 
-    batch_size = 32 # 128
+    batch_size = 128 if args.test else 32
+
     image_height = 64
-    image_width = 32
-    use_own_dataset = True
+    image_width = 64
+
+    use_own_dataset = not args.test
 
     get_dataset = own_dataset if use_own_dataset else cifar10_dataset
 
-    train_dataset, valid_dataset, steps_per_epoch, validation_steps = get_dataset(
+    train_dataset, valid_dataset, steps_per_epoch, validation_steps, num_classes = get_dataset(
+        folder=args.folder,
         batch_size=batch_size,
         image_height=image_height,
         image_width=image_width
     )
 
-    model = resnet_50(num_classes=10)
+    model = resnet_50(num_classes=num_classes)
     model.build(input_shape=(None, image_height, image_width, 3))
     model.summary()
 
@@ -169,7 +184,7 @@ if __name__ == "__main__":
               metrics=['acc'])
 
     model.fit(train_dataset,
-        epochs=30,
+        epochs=20,
         steps_per_epoch=steps_per_epoch,
         validation_data=valid_dataset,
         validation_steps=validation_steps,
