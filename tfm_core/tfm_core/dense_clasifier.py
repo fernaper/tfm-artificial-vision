@@ -1,3 +1,9 @@
+'''
+YOLO dense clasifier
+
+It is deprecated
+'''
+
 import cv2
 import numpy as np
 import os

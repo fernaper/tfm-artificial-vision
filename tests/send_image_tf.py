@@ -1,5 +1,4 @@
 import cv2
-import json
 import numpy as np
 import pathlib
 import requests
@@ -7,6 +6,7 @@ import requests
 from os.path import join
 
 from tfm_core import config
+from tfm_core.dnn import utilities
 
 
 def main(folder='binary_dataset'):
@@ -21,14 +21,7 @@ def main(folder='binary_dataset'):
     for image_path in images:
         frame = cv2.imread(image_path.as_posix())
 
-        data = json.dumps({"instances": [frame.tolist()]})
-
-        headers = {"signature_name": "predict", "content-type": "application/json"}
-        json_response = requests.post('http://localhost:8501/v1/models/resnet:predict', data=data, headers=headers)
-
-        response = json.loads(json_response.text)
-        predictions = np.array(response['predictions'][0])
-
+        predictions = utilities.send_frame_serving_tf(frame)
         #img = predictions
         #img = np.asarray(img, dtype=np.float32)
 

@@ -1,4 +1,5 @@
 import pathlib
+import requests
 import tensorflow as tf
 import numpy as np
 
@@ -8,6 +9,11 @@ from os import listdir
 from os.path import join, isdir, sep
 
 from tfm_core import config
+
+
+def get_labels(folder='dataset'):
+    data_dir = pathlib.Path(join(config.DATA_PATH, folder))
+    return np.array([item.name for item in data_dir.glob('*')])
 
 
 def cifar10_dataset(batch_size=64, **kwargs):
@@ -33,7 +39,7 @@ def own_dataset(folder='dataset',batch_size=32, image_height=64, image_width=32)
     data_dir = pathlib.Path(join(config.DATA_PATH, folder))
     image_count = len(list(data_dir.glob('*/*.jpg')))
 
-    class_names = np.array([item.name for item in data_dir.glob('*')])
+    class_names = get_labels(folder)
 
     image_generator = tf.keras.preprocessing.image.ImageDataGenerator(
         rescale=1./255,
@@ -122,9 +128,16 @@ def save_model(model, model_name='resnet'):
 
     print('\nSaved model: {}'.format(model_path))
 
-'''
-tensorflow_model_server \
-  --rest_api_port=8501 \
-  --model_name=fashion_model \
-  --model_base_path="/mnt/60BA93F4BA93C546/CommonDocuments/GitHub/tfm-artificial-vision/models/resnet" >server.log 2>&1
-'''
+
+def send_frame_serving_tf(frame, server='http://localhost:8501', model='resnet'):
+    json_response = requests.post(
+        '{server}/v1/models/{model}:predict'.format(server=server, model=model),
+        json = {
+            "instances": [frame.tolist()]
+        }
+    )
+
+    response = json_response.json()
+    predictions = np.array(response['predictions'][0])
+
+    return predictions
