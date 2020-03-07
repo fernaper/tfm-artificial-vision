@@ -1,12 +1,14 @@
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 import pathlib
 import requests
 import tensorflow as tf
-import numpy as np
 
 from datetime import datetime
-import matplotlib.pyplot as plt
 from os import listdir
 from os.path import join, isdir, sep
+from tqdm import tqdm
 
 from tfm_core import config
 
@@ -14,6 +16,22 @@ from tfm_core import config
 def get_labels(folder='dataset'):
     data_dir = pathlib.Path(join(config.DATA_PATH, folder))
     return np.array([item.name for item in data_dir.glob('*')])
+
+
+def scale_images(input_folder='dataset', output_folder='dataset', width=64, height=64):
+    input_dir = pathlib.Path(join(config.DATA_PATH, input_folder))
+    image_count = len(list(input_dir.glob('*/*.jpg')))
+
+    for image_path in tqdm(input_dir.glob('*/*.*'), total=image_count):
+        image = cv2.imread(image_path.as_posix())
+        image = cv2.resize(image, (width, height))
+        class_name = image_path.parent.name
+
+        output_dir = pathlib.Path(join(config.DATA_PATH, output_folder, class_name))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file_path = join(output_dir.as_posix(),image_path.name)
+
+        cv2.imwrite(output_file_path, image)
 
 
 def cifar10_dataset(batch_size=64, **kwargs):
@@ -86,13 +104,13 @@ def show_batch(image_batch, label_batch, class_names):
         plt.axis('off')
 
 
-def checkpoint_callback(model, model_name='resnet'):
+def checkpoint_callback(model, model_name='resnet', period=5):
     checkpoint_path = join(config.CHECKPOINTS_PATH, model_name, 'cp-{epoch:04d}.ckpt')
     callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path, 
         verbose=1, 
         save_weights_only=True,
-        period=5)
+        period=period)
 
     model.save_weights(checkpoint_path.format(epoch=0))
 

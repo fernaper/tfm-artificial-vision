@@ -16,7 +16,7 @@ def save_images_by_class(output_path, selected_class, sub_images):
         )
 
         image_path = join(output_path, file_name)
-        cv2.imwrite(image_path, sub_image) 
+        cv2.imwrite(image_path, sub_image)
 
 
 def process_frame(frame, classes_to_sub_images, limit_per_class, width=64, height=64, extra_info='video'):

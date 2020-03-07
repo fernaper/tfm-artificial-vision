@@ -12,6 +12,7 @@ setup(
         'tensorflow-gpu',
         'numpy',
         'opencv-python',
-        'cv2-tools'
+        'tqdm',
+        'cv2-tools',
     ],
 )
