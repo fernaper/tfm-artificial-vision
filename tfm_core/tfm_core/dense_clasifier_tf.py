@@ -42,12 +42,15 @@ class DenseClasifier(Dense_OF):
         end = False
         if show:
             bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-            for region_from, region_to, detected_class in detected_regions:
+            for region_from, region_to, detected_class, confidence in detected_regions:
+                if self.labels[detected_class] == 'background':
+                    continue
+
                 color = [int(c) for c in self.colors[detected_class]]
 
                 cv2.rectangle(frame, region_from, region_to, color, 2)
 
-                cv2.putText(frame, self.labels[detected_class],
+                cv2.putText(frame, '{} ({:.2f})'.format(self.labels[detected_class], confidence),
                     (region_from[0], region_from[1] - 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
                 )
@@ -89,8 +92,8 @@ class DenseClasifier(Dense_OF):
             if max(predictions) < self.confidence:
                 continue
 
-            # Touples (region_from, region_to, class_id)
-            yield region_from, region_to, detected_class_index
+            # Touples (region_from, region_to, class_id, confidence)
+            yield region_from, region_to, detected_class_index, max(predictions)
 
 
 if __name__ == "__main__":

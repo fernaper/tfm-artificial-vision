@@ -140,6 +140,12 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--test', default=False, action='store_true',
         help='Use test dataset (default False)')
 
+    parser.add_argument('-e', '--epochs', type=int, default=5,
+        help='Number of epochs to train (default: 5)')
+
+    parser.add_argument('-b', '--batch', type=int, default=128,
+        help='Batch size (default: 128)')
+
     args = parser.parse_args()
 
     # GPU settings
@@ -152,10 +158,9 @@ if __name__ == "__main__":
     #loss = 'categorical_crossentropy'
 
     #optimizer = tf.keras.optimizers.Adadelta()
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.003)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
-    batch_size = 128 if args.test else 32
-
+    batch_size = args.batch
     image_height = 64
     image_width = 64
 
@@ -181,10 +186,11 @@ if __name__ == "__main__":
 
     model.compile(optimizer=optimizer,
               loss=loss,
-              metrics=['acc'])
+              metrics=['acc']
+    )
 
     model.fit(train_dataset,
-        epochs=20,
+        epochs=args.epochs,
         steps_per_epoch=steps_per_epoch,
         validation_data=valid_dataset,
         validation_steps=validation_steps,
