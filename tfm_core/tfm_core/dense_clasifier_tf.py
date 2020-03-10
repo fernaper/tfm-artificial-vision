@@ -8,12 +8,13 @@ from tfm_core.dnn import utilities
 
 class DenseClasifier(Dense_OF):
 
-    def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, **kwargs):
+    def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, model='resnet', **kwargs):
         Dense_OF.__init__(self, video, stream, fps, scale=1, **kwargs)
 
         np.random.seed(50)
         self.__scale = scale
         self.confidence = confidence
+        self.model = model
 
         self.labels = labels
         self.colors = np.random.randint(0, 255, size=(len(self.labels), 3),dtype="uint8")
@@ -98,7 +99,7 @@ class DenseClasifier(Dense_OF):
         for region_from, region_to, cropped_frame in self.get_regions(thresholding_frame, frame):
             cropped_frame = cv2.resize(cropped_frame, (64,64))
 
-            predictions = utilities.send_frame_serving_tf(cropped_frame)
+            predictions = utilities.send_frame_serving_tf(cropped_frame, model=self.model)
             detected_class_index = np.where(predictions == np.amax(predictions))[0][0]
 
             if max(predictions) < self.confidence:
@@ -131,11 +132,14 @@ if __name__ == "__main__":
         help='Scale of the video (default 1.0)',
         type=float)
 
+    parser.add_argument('-m', '--model', default='resnet',
+        help='model name to call (default resnet)')
+
     args = parser.parse_args()
     kwargs = {}
 
     if args.scale is not None:
         kwargs['scale'] = args.scale
 
-    dc = DenseClasifier(utilities.get_labels(args.dataset), args.video, args.stream, args.fps, **kwargs)
+    dc = DenseClasifier(utilities.get_labels(args.dataset), args.video, args.stream, args.fps, model=args.model, **kwargs)
     dc.run()
