@@ -65,18 +65,30 @@ class DenseClasifier(Dense_OF):
         return gray_frame, hsv, end
 
 
-    def threshold_frame(self, gray_frame):
-        #TODO: Try other thresholding methods
-        _, thresholding_frame = cv2.threshold(gray_frame,15,255,cv2.THRESH_BINARY)
+    def threshold_frame(self, gray_frame, use_otsu=True):
+        threshold_method = cv2.THRESH_BINARY
+
+        if use_otsu:
+            threshold_method += cv2.THRESH_OTSU
+
+        _, thresholding_frame = cv2.threshold(gray_frame, 17, 255, threshold_method)
+
         return thresholding_frame
 
 
     def get_regions(self, gray_frame, frame_to_crop, min_dim_size=20):
+        height, width = gray_frame.shape[:2]
         contours, _ = cv2.findContours(gray_frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         for contour in contours:
             x,y,w,h = cv2.boundingRect(contour)
+
+            # If it is a really small region
             if w < min_dim_size or h < min_dim_size:
+                continue
+
+            # If it is a really big region
+            if h > height / 2 or w > width / 2:
                 continue
 
             yield (x, y), (x+w, y+h), frame_to_crop[y:y+h, x:x+w]
