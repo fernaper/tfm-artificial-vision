@@ -159,6 +159,11 @@ def send_frame_serving_tf(frame, server='http://localhost:8501', model='resnet',
     )
 
     response = json_response.json()
+    print(response)
+
+    if 'error' in response:
+        return None
+
     predictions = np.array(response['predictions'][0])
 
     return predictions

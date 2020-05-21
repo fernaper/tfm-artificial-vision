@@ -8,14 +8,14 @@ class AlexNet(tf.keras.models.Sequential):
     def __init__(self, input_shape, num_classes):
         super().__init__()
 
-        self.add(tf.keras.layers.Conv2D(96, kernel_size=(11,11), strides= 4,
+        self.add(tf.keras.layers.Conv2D(64, kernel_size=(11,11), strides= 4,
                         padding= 'valid', activation= 'relu',
                         input_shape=input_shape,
                         kernel_initializer= 'he_normal'))
         self.add(tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides= (2,2),
                         padding= 'valid', data_format= None))
 
-        self.add(tf.keras.layers.Conv2D(256, kernel_size=(5,5), strides= 1,
+        self.add(tf.keras.layers.Conv2D(192, kernel_size=(5,5), strides= 1,
                         padding= 'same', activation= 'relu',
                         kernel_initializer= 'he_normal'))
         self.add(tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides= (2,2),
@@ -40,7 +40,7 @@ class AlexNet(tf.keras.models.Sequential):
         self.add(tf.keras.layers.Dense(4096, activation= 'relu'))
         self.add(tf.keras.layers.Dense(4096, activation= 'relu'))
         self.add(tf.keras.layers.Dense(1000, activation= 'relu'))
-        self.add(tf.keras.layers.Dense(num_classes, activation= 'softmax'))
+        self.add(tf.keras.layers.Dense(units=num_classes, activation=tf.keras.activations.softmax))
 
 
 def alexnet(num_classes, width=64, height=64):

@@ -8,7 +8,7 @@ from tfm_core.dnn import utilities
 
 class DenseClasifier(Dense_OF):
 
-    def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, model='resnet', **kwargs):
+    def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, model='resnet', dnn_size=64, **kwargs):
         Dense_OF.__init__(self, video, stream, fps, scale=1, **kwargs)
 
         np.random.seed(50)
@@ -18,6 +18,7 @@ class DenseClasifier(Dense_OF):
 
         self.labels = labels
         self.colors = np.random.randint(0, 255, size=(len(self.labels), 3),dtype="uint8")
+        self.dnn_size = dnn_size
 
 
     def run(self):
@@ -97,9 +98,13 @@ class DenseClasifier(Dense_OF):
 
     def detect(self, thresholding_frame, frame):
         for region_from, region_to, cropped_frame in self.get_regions(thresholding_frame, frame):
-            cropped_frame = cv2.resize(cropped_frame, (64,64))
+            cropped_frame = cv2.resize(cropped_frame, (self.dnn_size,self.dnn_size))
 
             predictions = utilities.send_frame_serving_tf(cropped_frame, model=self.model)
+
+            if predictions is None:
+                continue
+
             detected_class_index = np.where(predictions == np.amax(predictions))[0][0]
 
             if max(predictions) < self.confidence:
@@ -135,11 +140,15 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--model', default='resnet',
         help='model name to call (default resnet)')
 
+    parser.add_argument('-i', '--image_size', default=64,
+        help='Size of the image sended to the neural network (default 64)',
+        type=int)
+
     args = parser.parse_args()
     kwargs = {}
 
     if args.scale is not None:
         kwargs['scale'] = args.scale
 
-    dc = DenseClasifier(utilities.get_labels(args.dataset), args.video, args.stream, args.fps, model=args.model, **kwargs)
+    dc = DenseClasifier(utilities.get_labels(args.dataset), args.video, args.stream, args.fps, model=args.model, dnn_size=args.image_size, **kwargs)
     dc.run()
