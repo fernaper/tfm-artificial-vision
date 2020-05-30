@@ -48,8 +48,9 @@ class BasicMovementDetector(VideoController):
 
 class MOG2MovementDetector(VideoController):
 
-    def __init__(self, video, stream, fps, dilate=False):
+    def __init__(self, video, stream, fps, dilate=False, scale=1.0):
         VideoController.__init__(self, video, stream, fps)
+        self.__scale = scale
 
 
     def run(self):
@@ -59,20 +60,10 @@ class MOG2MovementDetector(VideoController):
             # Helper selector to draw contours
             selector = SelectorCV2(color=(0, 0, 200), peephole=False)
 
-            if self.manager_cv2.new_scene or self.manager_cv2.key_manager.action:
-                self.manager_cv2.key_manager.action = False
-                print('New scene')
-                back_sub.clear()
-                back_sub = None
-                back_sub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+            if self.__scale != 1:
+                frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
 
-            fg_mask = back_sub.apply(frame)
-
-            # It will help with some holes
-            if self.dilate:
-                fg_mask = cv2.dilate(fg_mask, None, iterations=2)
-
-            contours = VideoController.find_contours(fg_mask)
+            fg_mask, contours = self.next_frame(frame, back_sub)
 
             for contour in contours:
                 selector.add_zone(contour)
@@ -85,10 +76,30 @@ class MOG2MovementDetector(VideoController):
         cv2.destroyAllWindows()
 
 
+    def next_frame(self, frame, back_sub):
+        if self.manager_cv2.new_scene or self.manager_cv2.key_manager.action:
+            self.manager_cv2.key_manager.action = False
+            print('New scene')
+            back_sub.clear()
+            back_sub = None
+            back_sub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+
+        fg_mask = back_sub.apply(frame)
+
+        # It will help with some holes
+        if self.dilate:
+            fg_mask = cv2.dilate(fg_mask, None, iterations=2)
+
+        contours = VideoController.find_contours(fg_mask)
+
+        return fg_mask, contours
+
+
 class KNNMovementDetector(VideoController):
 
-    def __init__(self, video, stream, fps, dilate=False):
+    def __init__(self, video, stream, fps, dilate=False, scale=1.0):
         VideoController.__init__(self, video, stream, fps, dilate)
+        self.__scale = scale
 
 
     def run(self):
@@ -98,20 +109,10 @@ class KNNMovementDetector(VideoController):
             # Helper selector to draw contours
             selector = SelectorCV2(color=(0, 0, 200), peephole=False)
 
-            if self.manager_cv2.new_scene or self.manager_cv2.key_manager.action:
-                self.manager_cv2.key_manager.action = False
-                print('New scene')
-                back_sub.clear()
-                back_sub = None
-                back_sub = cv2.createBackgroundSubtractorKNN(history=500, dist2Threshold=400, detectShadows=True)
+            if self.__scale != 1:
+                frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
 
-            fg_mask = back_sub.apply(frame)
-
-            # It will help with some holes
-            if self.dilate:
-                fg_mask = cv2.dilate(fg_mask, None, iterations=2)
-
-            contours = VideoController.find_contours(fg_mask)
+            fg_mask, contours = self.next_frame(frame, back_sub)
 
             for contour in contours:
                 selector.add_zone(contour)
@@ -122,6 +123,25 @@ class KNNMovementDetector(VideoController):
             cv2.imshow('FG Mask', fg_mask)
 
         cv2.destroyAllWindows()
+
+
+    def next_frame(self, frame, back_sub):
+        if self.manager_cv2.new_scene or self.manager_cv2.key_manager.action:
+            self.manager_cv2.key_manager.action = False
+            print('New scene')
+            back_sub.clear()
+            back_sub = None
+            back_sub = cv2.createBackgroundSubtractorKNN(history=500, dist2Threshold=400, detectShadows=True)
+
+        fg_mask = back_sub.apply(frame)
+
+        # It will help with some holes
+        if self.dilate:
+            fg_mask = cv2.dilate(fg_mask, None, iterations=2)
+
+        contours = VideoController.find_contours(fg_mask)
+
+        return fg_mask, contours
 
 
 if __name__ == "__main__":
@@ -135,6 +155,10 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--stream',
         help='if you pass it, it means that the video is an streaming',
         action='store_true')
+
+    parser.add_argument('-S', '--scale', default=1.0,
+        help='Scale of the video (default 1.0)',
+        type=float)
 
     parser.add_argument('-f', '--fps', default=0,
         help='int parameter to indicate the limit of FPS (default 0, it means no limit)',
@@ -164,6 +188,9 @@ if __name__ == "__main__":
         args.algorithm = 'basic'
 
     kwargs = {}
+
+    if args.algorithm != 'basic':
+        kwargs['scale'] = args.scale
 
     if args.dilate is not None:
         kwargs['dilate'] = args.dilate

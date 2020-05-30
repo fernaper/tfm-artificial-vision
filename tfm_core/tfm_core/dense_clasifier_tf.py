@@ -3,10 +3,11 @@ import numpy as np
 import os
 
 from tfm_core.optical_flow import Dense_OF
+from tfm_core.movement_detection import MOG2MovementDetector, KNNMovementDetector
 from tfm_core.dnn import utilities
 
 
-class DenseClasifier(Dense_OF):
+class DenseClassifier(Dense_OF):
 
     def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, model='resnet', dnn_size=64, **kwargs):
         Dense_OF.__init__(self, video, stream, fps, scale=1, **kwargs)
@@ -114,6 +115,107 @@ class DenseClasifier(Dense_OF):
             yield region_from, region_to, detected_class_index, max(predictions)
 
 
+class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
+
+    def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, model='resnet', dnn_size=64, parent=None, **kwargs):
+        super().__init__(video, stream, fps, scale=1, **kwargs)
+
+        np.random.seed(50)
+        self.__scale = scale
+        self.confidence = confidence
+        self.model = model
+
+        self.labels = labels
+        self.colors = np.random.randint(0, 255, size=(len(self.labels), 3),dtype="uint8")
+        self.dnn_size = dnn_size
+
+        self.parent = parent
+
+
+    def run(self):
+        back_sub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+
+        for frame in self.manager_cv2:
+            if self.__scale != 1:
+                frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
+
+            fg_mask, frame, end = self.next_frame(frame, back_sub, show=True)
+
+            cv2.imshow('FG Mask', fg_mask)
+            cv2.imshow('DNN', frame)
+
+            if end:
+                break
+
+        cv2.destroyAllWindows()
+
+
+    def next_frame(self, frame, back_sub, show=False):
+        if self.parent == None:
+            print('Must select parent')
+            return None, None, True
+
+        fg_mask, contours = self.parent.next_frame(self, frame, back_sub)
+        detected_regions = self.detect(contours, frame)
+
+        end = False
+
+        if show:
+            for region_from, region_to, detected_class, confidence in detected_regions:
+                if self.labels[detected_class] == 'background':
+                    continue
+
+                color = [int(c) for c in self.colors[detected_class]]
+
+                cv2.rectangle(frame, region_from, region_to, color, 2)
+
+                cv2.putText(frame, '{} ({:.2f})'.format(self.labels[detected_class], confidence),
+                    (region_from[0], region_from[1] - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
+                )
+
+            if cv2.waitKey(1) == ord('q'):
+                end = True
+
+        return fg_mask, frame, end
+
+
+    def get_regions(self, contours, frame_to_crop, min_dim_size=20):
+        height, width = frame_to_crop.shape[:2]
+
+        for x1, y1, x2, y2 in contours:
+            w = x2 - x1
+            h = y2 - y1
+
+            # If it is a really small region
+            if w < min_dim_size or h < min_dim_size:
+                continue
+
+            # If it is a really big region
+            if h > height / 2 or w > width / 2:
+                continue
+
+            yield (x1, y1), (x2, y2), frame_to_crop[y1:y2, x1:x2]
+
+
+    def detect(self, contours, frame):
+        for region_from, region_to, cropped_frame in self.get_regions(contours, frame):
+            cropped_frame = cv2.resize(cropped_frame, (self.dnn_size,self.dnn_size))
+
+            predictions = utilities.send_frame_serving_tf(cropped_frame, model=self.model)
+
+            if predictions is None:
+                continue
+
+            detected_class_index = np.where(predictions == np.amax(predictions))[0][0]
+
+            if max(predictions) < self.confidence:
+                continue
+
+            # Touples (region_from, region_to, class_id, confidence)
+            yield region_from, region_to, detected_class_index, max(predictions)
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -121,6 +223,9 @@ if __name__ == "__main__":
 
     parser.add_argument('-v', '--video', default=0,
         help='input video/stream (default 0, it is your main webcam)')
+
+    parser.add_argument('-a', '--algorithm', default='dense',
+        help='object detector algorithm <dense>/<mog2>/<knn> (default: dense)')
 
     parser.add_argument('-d', '--dataset', default='dataset',
         help='dataset you want to use (default dataset)')
@@ -150,5 +255,25 @@ if __name__ == "__main__":
     if args.scale is not None:
         kwargs['scale'] = args.scale
 
-    dc = DenseClasifier(utilities.get_labels(args.dataset), args.video, args.stream, args.fps, model=args.model, dnn_size=args.image_size, **kwargs)
+    args.algorithm = args.algorithm.lower()
+
+    algorithms = {
+        'dense': DenseClassifier,
+        'mog2': MovementClassifier,
+        'knn': MovementClassifier
+    }
+
+    if args.algorithm not in algorithms:
+        print('Warning: Algorithm selected invalid. Using default one: dense')
+        args.algorithm = 'dense'
+
+    if args.algorithm != 'dense':
+        parents = {
+            'mog2': MOG2MovementDetector,
+            'knn': KNNMovementDetector
+        }
+
+        kwargs['parent'] = parents[args.algorithm]
+
+    dc = algorithms[args.algorithm](utilities.get_labels(args.dataset), args.video, args.stream, args.fps, model=args.model, dnn_size=args.image_size, **kwargs)
     dc.run()
