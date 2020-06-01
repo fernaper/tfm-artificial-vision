@@ -11,7 +11,7 @@ import os
 from optical_flow import Dense_OF
 
 
-class DenseClasifier(Dense_OF):
+class Yolo(Dense_OF):
 
     def __init__(self, net, labels, video, stream, fps, scale=1, confidence = 0.5, threshold = 0.3, **kwargs):
         Dense_OF.__init__(self, video, stream, fps, scale=1, **kwargs)
@@ -202,5 +202,5 @@ if __name__ == "__main__":
     if args.scale is not None:
         kwargs['scale'] = args.scale
 
-    dc = DenseClasifier(net, labels, args.video, args.stream, args.fps, **kwargs)
+    dc = Yolo(net, labels, args.video, args.stream, args.fps, **kwargs)
     dc.run()
