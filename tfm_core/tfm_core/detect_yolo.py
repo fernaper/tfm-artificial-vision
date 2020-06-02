@@ -160,7 +160,6 @@ class Yolo(Dense_OF):
         return frame
 
 
-
 if __name__ == "__main__":
     import argparse
 
