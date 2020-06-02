@@ -217,6 +217,8 @@ class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
 
 
 if __name__ == "__main__":
+    # python3 detect.py -S 0.5 -v ../../videos/20181006_130650.mp4 -d medium_mio-tcd_dataset_9 -m resnet -i 64 -a knn
+    # python3 detect.py -S 0.5 -v ../../videos/20181006_130650.mp4 -d medium_mio-tcd_dataset_9 -m alexnet -i 227 -a knn
     import argparse
 
     parser = argparse.ArgumentParser()
