@@ -133,7 +133,7 @@ class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
 
 
     def run(self):
-        back_sub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+        back_sub = self.parent.background_substractor(self)
 
         for frame in self.manager_cv2:
             if self.__scale != 1:

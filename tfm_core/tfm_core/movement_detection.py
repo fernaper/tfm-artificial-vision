@@ -76,13 +76,17 @@ class MOG2MovementDetector(VideoController):
         cv2.destroyAllWindows()
 
 
+    def background_substractor(self):
+        return cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+
+
     def next_frame(self, frame, back_sub):
         if self.manager_cv2.new_scene or self.manager_cv2.key_manager.action:
             self.manager_cv2.key_manager.action = False
             print('New scene')
             back_sub.clear()
             back_sub = None
-            back_sub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+            back_sub = self.background_substractor()
 
         fg_mask = back_sub.apply(frame)
 
@@ -103,7 +107,7 @@ class KNNMovementDetector(VideoController):
 
 
     def run(self):
-        back_sub = cv2.createBackgroundSubtractorKNN(history=500, dist2Threshold=400, detectShadows=True)
+        back_sub = self.background_substractor()
 
         for frame in self.manager_cv2:
             # Helper selector to draw contours
@@ -125,13 +129,17 @@ class KNNMovementDetector(VideoController):
         cv2.destroyAllWindows()
 
 
+    def background_substractor(self):
+        return cv2.createBackgroundSubtractorKNN(history=500, dist2Threshold=400, detectShadows=True)
+
+
     def next_frame(self, frame, back_sub):
         if self.manager_cv2.new_scene or self.manager_cv2.key_manager.action:
             self.manager_cv2.key_manager.action = False
             print('New scene')
             back_sub.clear()
             back_sub = None
-            back_sub = cv2.createBackgroundSubtractorKNN(history=500, dist2Threshold=400, detectShadows=True)
+            back_sub = self.background_substractor()
 
         fg_mask = back_sub.apply(frame)
 
