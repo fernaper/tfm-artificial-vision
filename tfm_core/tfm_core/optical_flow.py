@@ -159,15 +159,6 @@ class Dense_OF(VideoController):
 
     def __init__(self, video, stream, fps, scale=1, separate_frame=None, concatenate_frame=None, process_all_frame=True):
         VideoController.__init__(self, video, stream, fps)
-        max_corners = 200
-
-        # Parameters for ShiTomasi corner detection
-        self.feature_params = {
-            'maxCorners': max_corners,
-            'qualityLevel': 0.3,
-            'minDistance': 7,
-            'blockSize': 7
-        }
 
         self.__scale = scale
         self.separate_frame = separate_frame
