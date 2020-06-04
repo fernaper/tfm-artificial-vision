@@ -214,7 +214,6 @@ class Dense_OF(VideoController):
         if not self.process_all_frame and self.concatenate_frame is not None:
             final_frame = self.concatenate_frame(frame, not_processable_frame)
 
-
         end = False
         if show:
             cv2.imshow('BGR', bgr)

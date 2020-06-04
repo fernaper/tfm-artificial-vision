@@ -79,8 +79,13 @@ class VideoController():
 
     def run(self):
         for frame in self.manager_cv2:
+            frame = self.next_frame(frame)
             cv2.imshow(self.name, frame)
         cv2.destroyAllWindows()
+
+
+    def next_frame(self, frame, *args):
+        return frame
 
 
 if __name__ == "__main__":
