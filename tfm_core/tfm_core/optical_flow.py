@@ -90,6 +90,8 @@ class LucasKanade_OF(VideoController):
         gray_frame = None
         current_points = None
         mask = None
+        good_new = []
+        good_old = []
         window_name = 'Lucas Kanade'
 
         cv2.namedWindow(window_name)
@@ -97,31 +99,9 @@ class LucasKanade_OF(VideoController):
         cv2.createTrackbar('Maxlevel+1', window_name, 0, 20, self.__set_max_level)
 
         for frame in self.manager_cv2:
-            prev_gray_frame = gray_frame
-
-            if self.separate_frame is not None:
-                frame, not_processable_frame = self.separate_frame(frame, fx=self.__scale, fy=self.__scale)
-            else:
-                frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
-
-            gray_frame = VideoController.gray_conversion(frame)
-
-            if prev_gray_frame is None or self.manager_cv2.key_manager.action or self.manager_cv2.count_frames % 60 == 0:
-                self.manager_cv2.key_manager.action = False
-
-                prev_gray_frame = gray_frame
-                # This is a method to detect corners
-                current_points = cv2.goodFeaturesToTrack(prev_gray_frame, mask=None, **self.feature_params)
-                mask = np.zeros_like(prev_gray_frame) # Mask image (for drawing)
-
-                continue
-
-            # Calculate OF Lucas Kanade
-            next_points, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray_frame, gray_frame, current_points, None, **self.lk_params)
-
-            # Select good points
-            good_old = current_points[status == 1]
-            good_new = next_points[status == 1]
+            frame, gray_frame, current_points, mask, good_new, good_old = self.next_frame(
+                frame, not_processable_frame, gray_frame, current_points, mask, good_new, good_old
+            )
 
             # Draw the tracks
             for (new, old) in zip(good_new, good_old):
@@ -134,7 +114,7 @@ class LucasKanade_OF(VideoController):
             frame = cv2.add(frame, cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB))
 
             final_frame = frame
-            if self.concatenate_frame is not None:
+            if self.concatenate_frame is not None and self.separate_frame is not None:
                 final_frame = self.concatenate_frame(frame, not_processable_frame)
 
             cv2.imshow(window_name, final_frame)
@@ -145,6 +125,34 @@ class LucasKanade_OF(VideoController):
 
             if self.manager_cv2.count_frames % 10 == 0:
                 mask = np.zeros_like(prev_gray_frame) # Mask image (for drawing)
+
+
+    def next_frame(self, frame, prev_gray_frame, current_points, mask, good_new=[], good_old=[]):
+        if self.separate_frame is not None:
+            frame, not_processable_frame = self.separate_frame(frame, fx=self.__scale, fy=self.__scale)
+        else:
+            frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
+            not_processable_frame = None
+
+        gray_frame = VideoController.gray_conversion(frame)
+
+        if prev_gray_frame is None or self.manager_cv2.key_manager.action or self.manager_cv2.count_frames % 60 == 0:
+            self.manager_cv2.key_manager.action = False
+
+            # This is a method to detect corners
+            current_points = cv2.goodFeaturesToTrack(gray_frame, mask=None, **self.feature_params)
+            mask = np.zeros_like(gray_frame) # Mask image (for drawing)
+
+            return frame, gray_frame, current_points, mask, good_new, good_old
+
+        # Calculate OF Lucas Kanade
+        next_points, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray_frame, gray_frame, current_points, None, **self.lk_params)
+
+        # Select good points
+        good_old = current_points[status == 1]
+        good_new = next_points[status == 1]
+
+        return frame, not_processable_frame, gray_frame, current_points, mask, good_new, good_old
 
 
 class Dense_OF(VideoController):
