@@ -72,6 +72,8 @@ class LucasKanade_OF(VideoController):
         self.__scale = scale
         self.separate_frame = separate_frame
         self.concatenate_frame = concatenate_frame
+        self.measure_performance = kwargs.get('measure_performance', False)
+        self.draw_frame = kwargs.get('draw_frame', True)
 
 
     def __set_win_size(self, x):
@@ -92,9 +94,10 @@ class LucasKanade_OF(VideoController):
         mask = None
         window_name = 'Lucas Kanade'
 
-        cv2.namedWindow(window_name)
-        cv2.createTrackbar('WinSize+5', window_name, 0, 45, self.__set_win_size)
-        cv2.createTrackbar('Maxlevel+1', window_name, 0, 20, self.__set_max_level)
+        if self.draw_frame:
+            cv2.namedWindow(window_name)
+            cv2.createTrackbar('WinSize+5', window_name, 0, 45, self.__set_win_size)
+            cv2.createTrackbar('Maxlevel+1', window_name, 0, 20, self.__set_max_level)
 
         for frame in self.manager_cv2:
             prev_gray_frame = gray_frame
@@ -123,21 +126,23 @@ class LucasKanade_OF(VideoController):
             good_old = current_points[status == 1]
             good_new = next_points[status == 1]
 
-            # Draw the tracks
-            for (new, old) in zip(good_new, good_old):
-                old_x, old_y = old.ravel()
-                new_x, new_y = new.ravel()
+            if self.draw_frame:
+                # Draw the tracks
+                for (new, old) in zip(good_new, good_old):
+                    old_x, old_y = old.ravel()
+                    new_x, new_y = new.ravel()
 
-                mask = cv2.line(mask, (new_x, new_y), (old_x, old_y), (100,100,100), 2)
-                frame = cv2.circle(frame, (new_x, new_y), 4, (0, 0, 255), -1)
+                    mask = cv2.line(mask, (new_x, new_y), (old_x, old_y), (100,100,100), 2)
+                    frame = cv2.circle(frame, (new_x, new_y), 4, (0, 0, 255), -1)
 
-            frame = cv2.add(frame, cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB))
+                frame = cv2.add(frame, cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB))
 
             final_frame = frame
             if self.concatenate_frame is not None:
                 final_frame = self.concatenate_frame(frame, not_processable_frame)
 
-            cv2.imshow(window_name, final_frame)
+            if self.draw_frame:
+                cv2.imshow(window_name, final_frame)
 
             # Now update the previous frame and previous points
             prev_gray_frame = gray_frame.copy()
@@ -146,10 +151,13 @@ class LucasKanade_OF(VideoController):
             if self.manager_cv2.count_frames % 10 == 0:
                 mask = np.zeros_like(prev_gray_frame) # Mask image (for drawing)
 
+        if self.measure_performance:
+            print(self.manager_cv2.get_fps())
+
 
 class Dense_OF(VideoController):
 
-    def __init__(self, video, stream, fps, scale=1, separate_frame=None, concatenate_frame=None, process_all_frame=True):
+    def __init__(self, video, stream, fps, scale=1, separate_frame=None, concatenate_frame=None, process_all_frame=True, **kwargs):
         VideoController.__init__(self, video, stream, fps)
         max_corners = 200
 
@@ -165,6 +173,8 @@ class Dense_OF(VideoController):
         self.separate_frame = separate_frame
         self.concatenate_frame = concatenate_frame
         self.process_all_frame = process_all_frame
+        self.measure_performance = kwargs.get('measure_performance', False)
+        self.draw_frame = kwargs.get('draw_frame', True)
 
 
     def run(self):
@@ -172,10 +182,12 @@ class Dense_OF(VideoController):
         hsv = None
 
         for frame in self.manager_cv2:
-            gray_frame, hsv, end = self.next_frame(frame, gray_frame, hsv, show=True)
+            gray_frame, hsv, end = self.next_frame(frame, gray_frame, hsv, show=self.draw_frame)
 
             if end:
                 break
+
+        print(self.manager_cv2.get_fps())
 
 
     def next_frame(self, frame, gray_frame, hsv, show=False):
@@ -268,6 +280,12 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--complete_frame', action='store_true',
                         help='Detect in complete frame (True|False)')
 
+    parser.add_argument('-m', '--measure_performance', action='store_true',
+                        help='Measure performance (True|False)')
+
+    parser.add_argument('-n', '--no_interface', action='store_false',
+                        help='Show interface (True|False)')
+
     args = parser.parse_args()
 
     if type(args.video) is str and args.video.isdigit():
@@ -288,6 +306,12 @@ if __name__ == "__main__":
 
     if args.scale is not None:
         kwargs['scale'] = args.scale
+
+    if args.measure_performance:
+        kwargs['measure_performance'] = True
+
+    if not args.no_interface:
+        kwargs['draw_frame'] = False
 
     of = optical_detector[args.algorithm](args.video, args.stream, args.fps,
             process_all_frame=args.complete_frame,
