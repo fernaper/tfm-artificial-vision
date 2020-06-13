@@ -46,7 +46,7 @@ class LucasKanade_OF(VideoController):
     A better solution is obtained with least square fit method. 
     '''
 
-    def __init__(self, video, stream, fps, scale=1, separate_frame=None, concatenate_frame=None, **kwargs):
+    def __init__(self, video, stream, fps, scale=1, separate_frame=None, process_all_frame=False, concatenate_frame=None, **kwargs):
         VideoController.__init__(self, video, stream, fps)
 
         max_corners = 200
@@ -70,6 +70,7 @@ class LucasKanade_OF(VideoController):
         self.color = np.random.randint(0, 255, (max_corners, 3))
 
         self.__scale = scale
+        self.process_all_frame = process_all_frame
         self.separate_frame = separate_frame
         self.concatenate_frame = concatenate_frame
         self.measure_performance = kwargs.get('measure_performance', False)
@@ -119,7 +120,7 @@ class LucasKanade_OF(VideoController):
                 frame = cv2.add(frame, cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB))
 
             final_frame = frame
-            if self.concatenate_frame is not None and self.separate_frame is not None:
+            if self.concatenate_frame is not None and self.separate_frame is not None and not self.process_all_frame:
                 final_frame = self.concatenate_frame(frame, not_processable_frame)
 
             if self.draw_frame:
@@ -139,7 +140,7 @@ class LucasKanade_OF(VideoController):
 
 
     def next_frame(self, frame, not_processable_frame, prev_gray_frame, current_points, mask, good_new=[], good_old=[]):
-        if self.separate_frame is not None:
+        if self.separate_frame is not None and not self.process_all_frame:
             frame, not_processable_frame = self.separate_frame(frame, fx=self.__scale, fy=self.__scale)
         else:
             frame = cv2.resize(frame, None, fx=self.__scale, fy=self.__scale)
