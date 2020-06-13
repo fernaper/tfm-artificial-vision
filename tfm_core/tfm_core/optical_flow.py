@@ -127,7 +127,9 @@ class LucasKanade_OF(VideoController):
 
             # Now update the previous frame and previous points
             prev_gray_frame = gray_frame.copy()
-            current_points = good_new.reshape(-1, 1, 2)
+
+            if type(good_new) != list:
+                current_points = good_new.reshape(-1, 1, 2)
 
             if self.manager_cv2.count_frames % 10 == 0:
                 mask = np.zeros_like(prev_gray_frame) # Mask image (for drawing)
