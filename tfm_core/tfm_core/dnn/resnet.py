@@ -146,6 +146,9 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--batch', type=int, default=128,
         help='Batch size (default: 128)')
 
+    parser.add_argument('-m', '--model', type=int, default=50,
+        help='Model type 18|34|50|101|152 (default: 50)')
+
     args = parser.parse_args()
 
     # GPU settings
@@ -175,7 +178,15 @@ if __name__ == "__main__":
         image_width=image_width
     )
 
-    model = resnet_50(num_classes=num_classes)
+    models = {
+        18: resnet_18,
+        34: resnet_34,
+        50: resnet_50,
+        101: resnet_101,
+        152: resnet_152
+    }
+
+    model = models[args.model](num_classes=num_classes)
     model.build(input_shape=(None, image_height, image_width, 3))
     model.summary()
 
@@ -197,4 +208,4 @@ if __name__ == "__main__":
         callbacks=callbacks
     )
 
-    save_model(model, model_name='resnet')
+    save_model(model, model_name='resnet-{}'.format(args.model) if args.model != 50 else 'resnet')

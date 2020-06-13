@@ -89,6 +89,7 @@ class LucasKanade_OF(VideoController):
 
     
     def run(self):
+        not_processable_frame = None
         gray_frame = None
         current_points = None
         mask = None
@@ -102,7 +103,7 @@ class LucasKanade_OF(VideoController):
             cv2.createTrackbar('Maxlevel+1', window_name, 0, 20, self.__set_max_level)
 
         for frame in self.manager_cv2:
-            frame, gray_frame, current_points, mask, good_new, good_old = self.next_frame(
+            frame, not_processable_frame, gray_frame, current_points, mask, good_new, good_old = self.next_frame(
                 frame, not_processable_frame, gray_frame, current_points, mask, good_new, good_old
             )
 
@@ -135,7 +136,7 @@ class LucasKanade_OF(VideoController):
             print(self.manager_cv2.get_fps())
 
 
-    def next_frame(self, frame, prev_gray_frame, current_points, mask, good_new=[], good_old=[]):
+    def next_frame(self, frame, not_processable_frame, prev_gray_frame, current_points, mask, good_new=[], good_old=[]):
         if self.separate_frame is not None:
             frame, not_processable_frame = self.separate_frame(frame, fx=self.__scale, fy=self.__scale)
         else:
@@ -151,7 +152,7 @@ class LucasKanade_OF(VideoController):
             current_points = cv2.goodFeaturesToTrack(gray_frame, mask=None, **self.feature_params)
             mask = np.zeros_like(gray_frame) # Mask image (for drawing)
 
-            return frame, gray_frame, current_points, mask, good_new, good_old
+            return frame, not_processable_frame, gray_frame, current_points, mask, good_new, good_old
 
         # Calculate OF Lucas Kanade
         next_points, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray_frame, gray_frame, current_points, None, **self.lk_params)
