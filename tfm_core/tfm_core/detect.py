@@ -130,7 +130,7 @@ class DenseClassifier(Dense_OF):
 
 class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
 
-    def __init__(self, labels, video, stream, fps, confidence = 0.5, scale=1, model='resnet', dnn_size=64, parent=None, **kwargs):
+    def __init__(self, labels, video, stream, fps, confidence = 0.25, scale=1, model='resnet', dnn_size=64, parent=None, **kwargs):
         super().__init__(video, stream, fps, scale=1, **kwargs)
 
         np.random.seed(50)

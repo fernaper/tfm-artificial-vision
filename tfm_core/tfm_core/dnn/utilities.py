@@ -15,7 +15,9 @@ from tfm_core import config
 
 def get_labels(folder='dataset'):
     data_dir = pathlib.Path(join(config.DATA_PATH, folder))
-    return np.array([item.name for item in data_dir.glob('*')])
+    labels = [item.name for item in data_dir.glob('*')]
+    labels.sort()
+    return np.array(labels)
 
 
 def scale_images(input_folder='dataset', output_folder='dataset', width=64, height=64):
@@ -169,3 +171,37 @@ def send_frame_serving_tf(frame, server='http://localhost:8501', model='resnet',
     predictions = np.array(response['predictions'][0])
 
     return predictions
+
+
+if __name__ == "__main__":
+    import argparse
+    import os
+    
+    ap = argparse.ArgumentParser()
+    ap.add_argument('-m', '--model', type=str, default='resnet', required=False, help='Model to use')
+    ap.add_argument('-d', '--dataset', type=str, default='mio-tcd-final', required=False, help='Dataset to use')
+    ap.add_argument('-i', '--image_folder', type=str, required=True, help='Image folder path to detect')
+    ap.add_argument('-l', '--limit_images', type=int, default=100, help='Limit images to check')
+    args = ap.parse_args()
+
+    labels = get_labels(args.dataset)
+    print(labels)
+
+    correct_category = args.image_folder.split('/')[-1]
+
+    correct, total = 0, 0
+
+    for image_path in os.listdir(args.image_folder):
+        img = cv2.imread(os.path.join(args.image_folder, image_path))
+
+        predictions =send_frame_serving_tf(img, model=args.model)
+        detected_class_index = np.where(predictions == np.amax(predictions))[0][0]
+
+        if labels[detected_class_index] == correct_category:
+            correct += 1.0
+        total += 1
+
+        print(labels[detected_class_index], max(predictions), correct/total)
+
+        if total >= args.limit_images:
+            break
