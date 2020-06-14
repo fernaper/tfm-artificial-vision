@@ -9,7 +9,7 @@ import numpy as np
 import os
 
 from optical_flow import Dense_OF
-
+from tfm_core import config
 
 class Yolo(Dense_OF):
 
@@ -180,7 +180,8 @@ if __name__ == "__main__":
         help='Scale of the video (default 1.0)',
         type=float)
     
-    parser.add_argument("-y", "--yolo", required=True,
+    default_yolo_path = os.path.sep.join([config.PROJECT_PATH, 'tfm-extra'])
+    parser.add_argument("-y", "--yolo", default=default_yolo_path,
 	    help="Base path to YOLO directory")
 
     args = parser.parse_args()

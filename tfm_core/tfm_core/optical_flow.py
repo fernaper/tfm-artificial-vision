@@ -190,7 +190,8 @@ class Dense_OF(VideoController):
             if end:
                 break
 
-        print(self.manager_cv2.get_fps())
+        if self.measure_performance:
+            print(self.manager_cv2.get_fps())
 
 
     def next_frame(self, frame, gray_frame, hsv, show=False):

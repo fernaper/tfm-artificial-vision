@@ -20,6 +20,8 @@ class DenseClassifier(Dense_OF):
         self.labels = labels
         self.colors = np.random.randint(0, 255, size=(len(self.labels), 3),dtype="uint8")
         self.dnn_size = dnn_size
+        self.measure_performance = kwargs.get('measure_performance', False)
+        self.draw_frame = kwargs.get('draw_frame', True)
 
 
     def run(self):
@@ -35,6 +37,9 @@ class DenseClassifier(Dense_OF):
             if end:
                 break
 
+        if self.measure_performance:
+            print(self.manager_cv2.get_fps())
+
 
     def next_frame(self, frame, gray_frame, hsv, show=False):
         gray_frame, hsv, _ = super().next_frame(frame, gray_frame, hsv)
@@ -44,8 +49,15 @@ class DenseClassifier(Dense_OF):
 
         end = False
         if show:
-            bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            bgr = None
+            if self.draw_frame:
+                bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
             for region_from, region_to, detected_class, confidence in detected_regions:
+                if not self.draw_frame:
+                    # Consumes the output
+                    continue
+
                 if self.labels[detected_class] == 'background':
                     continue
 
@@ -58,12 +70,13 @@ class DenseClassifier(Dense_OF):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
                 )
 
-            cv2.imshow('BGR', bgr)
-            cv2.imshow('Thresholding frame', thresholding_frame)
-            cv2.imshow('DNN', frame)
-            
-            if cv2.waitKey(1) == ord('q'):
-	            end = True
+            if self.draw_frame:
+                cv2.imshow('BGR', bgr)
+                cv2.imshow('Thresholding frame', thresholding_frame)
+                cv2.imshow('DNN', frame)
+                
+                if cv2.waitKey(1) == ord('q'):
+                    end = True
 
         return gray_frame, hsv, end
 
@@ -130,6 +143,8 @@ class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
         self.dnn_size = dnn_size
 
         self.parent = parent
+        self.measure_performance = kwargs.get('measure_performance', False)
+        self.draw_frame = kwargs.get('draw_frame', True)
 
 
     def run(self):
@@ -141,11 +156,15 @@ class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
 
             fg_mask, frame, end = self.next_frame(frame, back_sub, show=True)
 
-            cv2.imshow('FG Mask', fg_mask)
-            cv2.imshow('DNN', frame)
+            if self.draw_frame:
+                cv2.imshow('FG Mask', fg_mask)
+                cv2.imshow('DNN', frame)
 
             if end:
                 break
+
+        if self.measure_performance:
+            print(self.manager_cv2.get_fps())
 
         cv2.destroyAllWindows()
 
@@ -165,6 +184,10 @@ class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
                 if self.labels[detected_class] == 'background':
                     continue
 
+                if not self.draw_frame:
+                    # Consumes the output
+                    continue
+
                 color = [int(c) for c in self.colors[detected_class]]
 
                 cv2.rectangle(frame, region_from, region_to, color, 2)
@@ -174,7 +197,7 @@ class MovementClassifier(MOG2MovementDetector, KNNMovementDetector):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
                 )
 
-            if cv2.waitKey(1) == ord('q'):
+            if self.draw_frame and cv2.waitKey(1) == ord('q'):
                 end = True
 
         return fg_mask, frame, end
@@ -251,6 +274,12 @@ if __name__ == "__main__":
         help='Size of the image sended to the neural network (default 64)',
         type=int)
 
+    parser.add_argument('-n', '--no_interface', action='store_false',
+                        help='Show interface (True|False)')
+
+    parser.add_argument('-M', '--measure_performance', action='store_true',
+                        help='Measure performance (True|False)')
+
     args = parser.parse_args()
     kwargs = {}
 
@@ -276,6 +305,11 @@ if __name__ == "__main__":
         }
 
         kwargs['parent'] = parents[args.algorithm]
+
+    if not args.no_interface:
+        kwargs['draw_frame'] = False
+
+    kwargs['measure_performance'] = args.measure_performance
 
     dc = algorithms[args.algorithm](utilities.get_labels(args.dataset), args.video, args.stream, args.fps, model=args.model, dnn_size=args.image_size, **kwargs)
     dc.run()

@@ -147,7 +147,7 @@ def save_model(model, model_name='resnet'):
     print('\nSaved model: {}'.format(model_path))
 
 
-def send_frame_serving_tf(frame, server='http://localhost:8501', model='resnet', width=64, height=64):
+def send_frame_serving_tf(frame, server='http://localhost:8501', model='resnet', width=64, height=64, details=False):
     #frame = cv2.resize(frame, (width, height))
     frame = frame / 255
 
@@ -159,7 +159,9 @@ def send_frame_serving_tf(frame, server='http://localhost:8501', model='resnet',
     )
 
     response = json_response.json()
-    print(response)
+
+    if details:
+        print(response)
 
     if 'error' in response:
         return None

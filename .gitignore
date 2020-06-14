@@ -115,6 +115,7 @@ videos/
 coco/
 coco/**
 *.zip
+*.tar.gz
 
 tfm-ubuntu-venv/
 tfm_core/tfm_core.egg-info/
@@ -123,3 +124,4 @@ logs/
 checkpoints/
 models/
 data/
+tfm-extra/
